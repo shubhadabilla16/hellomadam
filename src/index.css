@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: 'Playfair Display', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    
+    /* Hello Madam Brand Palette */
+    --terracotta: #e03e1a;
+    --terracotta-dark: #b82e0e;
+    --terracotta-light: #fef2ee;
+    --champagne-gold: #c89b3c;
+    --warm-ivory: #faf7f2;
+    --soft-cream: #f4ece1;
+    --charcoal: #1c1917;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: #292524;
+    background-color: #faf7f2;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Custom delicate scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f4ece1;
+}
+::-webkit-scrollbar-thumb {
+  background: #debfa2;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c7a485;
+}

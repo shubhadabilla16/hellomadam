@@ -1,0 +1,7 @@
+{
+  "name": "Hello Madam - Ladies At-Home Beauty Solapur",
+  "description": "Premium ladies-only at-home beauty parlour & salon services in Solapur, Maharashtra. Facials, waxing, manicure, pedicure, hair spa, and bridal styling delivered to your doorstep.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
