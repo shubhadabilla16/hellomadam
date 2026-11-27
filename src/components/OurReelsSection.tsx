@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Play, Pause, Volume2, VolumeX, Sparkles, Maximize2, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import doorstepArrivalImg from '../assets/images/doorstep_beauty_arrival_1794549530140.jpg';
+import beauticianTeamImg from '../assets/images/professional_beautician_team_1794549515355.jpg';
 
 interface ReelData {
   id: string;
@@ -18,7 +20,7 @@ const REELS: ReelData[] = [
   {
     id: 'reel-treatment-action',
     videoSrc: '/assets/aistudio/WhatsApp_Video_2026-11-03_at_2.22.17_PM_d4ea3547.mp4',
-    posterSrc: '/assets/aistudio/hello_madam_team_arrival.jpg',
+    posterSrc: doorstepArrivalImg,
     title: 'Doorstep Facial & Skin Prep',
     titleHi: 'घर पर फेशियल और स्किन प्रेप',
     subtitle: 'Watch our beautician set up the sanitized parlour station',
@@ -29,7 +31,7 @@ const REELS: ReelData[] = [
   {
     id: 'reel-client-testimonial',
     videoSrc: '/assets/aistudio/WhatsApp_Video_2026-11-03_at_2.22.18_PM_1c3a4ff6.mp4',
-    posterSrc: '/assets/aistudio/hello_madam_team_group.jpg',
+    posterSrc: beauticianTeamImg,
     title: 'Client Review · Solapur',
     titleHi: 'ग्राहक अनुभव · सोलापूर',
     subtitle: 'Mrs. Pranita Amar Pompawar shares her at-home experience',
@@ -75,13 +77,15 @@ export const OurReelsSection: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-[#e03e1a] uppercase font-serif">
               <Sparkles className="w-3.5 h-3.5 text-[#e03e1a]" />
-              <span>{t('section.reels_title', 'Our Reels & Real Moments')}</span>
+              <span>{language === 'hi' ? 'हमारा वास्तविक कार्य और अनुभव' : 'Our Work & Real Experiences'}</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900 tracking-tight mt-1">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-stone-900 tracking-tight mt-2">
               {language === 'hi' ? 'सोलापूर में देखिए हेलो मैडम की लाइव सेवा' : 'Beauty in Action Across Solapur'}
             </h2>
-            <p className="text-xs sm:text-sm text-stone-500 mt-1 max-w-xl">
-              {t('section.reels_sub', 'Watch our certified beauticians in action and hear genuine feedback from Solapur residents.')}
+            <p className="text-sm text-stone-600 mt-2 max-w-xl">
+              {language === 'hi'
+                ? 'हमारी प्रमाणित ब्यूटीशियन्स को काम करते देखें और सोलापुर के ग्राहकों की वास्तविक राय सुनें।'
+                : 'Watch our certified beauticians in action and hear genuine doorstep feedback from Solapur residents.'}
             </p>
           </div>
 

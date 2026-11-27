@@ -1,107 +1,141 @@
 import React from 'react';
-import { Clock, Plus, Check, Info, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Clock, Plus, Check, Heart } from 'lucide-react';
+import { Service } from '../data/services';
 import { ServiceItem } from '../data/servicesData';
 import { useBooking } from '../context/BookingContext';
+import { formatPrice, formatDuration } from '../utils/formatters';
+import { getServiceImageKey, getImageKeyMeta } from '../data/serviceImages';
+import { ServiceImage } from './ServiceImage';
 
 interface ServiceCardProps {
-  service: ServiceItem;
-  onViewDetails?: (service: ServiceItem) => void;
+  service: Service | ServiceItem;
+  onViewDetails?: (service: Service | ServiceItem) => void;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ service, onViewDetails }) => {
-  const { toggleService, isSelected } = useBooking();
-  const active = isSelected(service.id);
+export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
+  const { isInCart, addToCart, isFavourite, toggleFavourite } = useBooking();
+
+  const id = service.id;
+  const inCart = isInCart(id);
+  const favorited = isFavourite(id);
+
+  // Normalize duration in minutes
+  const durationMins: number | undefined = typeof service.duration === 'number'
+    ? service.duration
+    : typeof service.duration === 'string'
+      ? (parseInt(service.duration, 10) || undefined)
+      : undefined;
+
+  const imageKey = getServiceImageKey(id);
+  const meta = getImageKeyMeta(imageKey);
 
   return (
-    <div className="group flex flex-col bg-white rounded-3xl border border-[#ebdccd] overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-      {/* Image Container with 4:3 Aspect Ratio */}
-      <div className="relative aspect-4/3 w-full overflow-hidden bg-stone-100">
-        <img
-          src={service.image}
-          alt={service.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          referrerPolicy="no-referrer"
-          loading="lazy"
-        />
+    <div className="group h-full flex flex-col bg-white rounded-2xl border border-[#ebdccd]/80 overflow-hidden shadow-xs hover:shadow-md transition-all duration-300">
+      {/* 1. Image on top: 4:3 aspect ratio, rounded corners, object-cover */}
+      <div className="relative aspect-4/3 w-full overflow-hidden bg-[#faf7f2]">
+        <Link to={`/service/${id}`} className="block w-full h-full" tabIndex={-1}>
+          <ServiceImage
+            imageKey={imageKey}
+            alt={service.name}
+            label={meta.label}
+            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
+          />
+        </Link>
 
-        {/* Subtle Gradient Scrim at bottom of image */}
-        <div className="absolute inset-0 bg-gradient-to-t from-stone-950/40 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
-
-        {/* Featured in Real Video Badge */}
-        {service.featuredInVideo && (
-          <div className="absolute top-3 left-3 bg-[#e03e1a]/95 text-white text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md backdrop-blur-xs flex items-center gap-1 shadow-xs">
-            <Sparkles className="w-3 h-3 text-amber-200" />
-            <span>Featured in Video</span>
-          </div>
-        )}
-
-        {/* Quick View Details Button */}
-        {onViewDetails && (
-          <button
-            onClick={() => onViewDetails(service)}
-            className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white text-stone-700 rounded-full shadow-sm opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
-            title="View Details"
-            aria-label={`View details for ${service.name}`}
-          >
-            <Info className="w-4 h-4" />
-          </button>
-        )}
+        {/* Small round white heart (favourite) button at top-right */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleFavourite(id);
+          }}
+          className={`absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center transition-transform active:scale-90 cursor-pointer ${
+            favorited
+              ? 'text-[#e03e1a]'
+              : 'text-stone-400 hover:text-[#e03e1a]'
+          }`}
+          title={favorited ? 'Remove from saved' : 'Save to favourites'}
+          aria-label={favorited ? `Remove ${service.name} from saved` : `Save ${service.name} to favourites`}
+        >
+          <Heart className={`w-4 h-4 ${favorited ? 'fill-[#e03e1a] stroke-[#e03e1a]' : 'stroke-current'}`} />
+        </button>
       </div>
 
-      {/* Card Body */}
-      <div className="flex-1 flex flex-col p-6">
-        {/* Unboxed Metadata Line with separators */}
-        <div className="flex items-center gap-2 text-xs text-stone-500 font-medium mb-1.5">
-          <span className="text-[#e03e1a] font-bold uppercase tracking-wider text-[11px]">
-            {service.categoryLabel}
-          </span>
-          <span aria-hidden="true" className="text-stone-300">·</span>
-          <span className="flex items-center gap-1 text-stone-500">
-            <Clock className="w-3.5 h-3.5 text-stone-400" />
-            <span>{service.duration}</span>
-          </span>
-        </div>
+      {/* 2. Card Body: service name, price & duration, brand line, full-width button */}
+      <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3">
+        
+        <div className="space-y-2">
+          {/* Service Name: max 2 lines, same height on all cards */}
+          <h3 className="text-xs sm:text-sm font-serif font-bold text-stone-900 leading-snug line-clamp-2 min-h-[2.5rem] sm:min-h-[2.75rem]">
+            <Link to={`/service/${id}`} className="hover:text-[#e03e1a] transition-colors">
+              {service.name}
+            </Link>
+          </h3>
 
-        {/* Service Title */}
-        <h3 className="text-base font-serif font-bold text-stone-900 leading-snug line-clamp-2 min-h-11">
-          {service.name}
-        </h3>
-
-        {/* Short Description */}
-        <p className="mt-2 text-xs text-stone-600 line-clamp-2 leading-relaxed flex-1">
-          {service.description}
-        </p>
-
-        {/* Card Footer: Price & Add/Select CTA */}
-        <div className="mt-5 pt-4 border-t border-[#ebdccd]/80 flex items-center justify-between gap-3">
-          <div>
-            <span className="text-[11px] text-stone-400 block font-serif">Estimated</span>
-            <span className="text-lg font-bold text-stone-900 tabular-nums">
-              ₹{service.price.toLocaleString('en-IN')}
+          {/* Price & Duration Row */}
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-base sm:text-lg font-bold text-[#e03e1a] tabular-nums tracking-tight">
+              {formatPrice(service.price)}
             </span>
+
+            {durationMins && durationMins > 0 ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full shrink-0">
+                <Clock className="w-3 h-3 text-stone-400" />
+                <span>{formatDuration(durationMins)}</span>
+              </span>
+            ) : null}
           </div>
 
+          {/* Small line "Hello Madam" with brand mark */}
+          <div className="flex items-center gap-1.5 pt-1 text-[11px] font-medium text-stone-500">
+            <img
+              src="/assets/aistudio/image_a7f9010e.png"
+              alt="Hello Madam"
+              className="w-4 h-4 rounded-xs object-contain"
+            />
+            <span className="font-serif text-stone-600">Hello Madam</span>
+          </div>
+        </div>
+
+        {/* 3. Action Buttons: Full-width rounded "Add to Cart" + "View Details" */}
+        <div className="pt-2 border-t border-[#ebdccd]/50 flex flex-col items-center gap-1.5">
           <button
-            onClick={() => toggleService(service)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              active
-                ? 'bg-[#fef2ee] text-[#e03e1a] border border-[#f4c8ba] shadow-2xs'
-                : 'bg-stone-900 text-white hover:bg-[#e03e1a] shadow-2xs hover:shadow-xs'
+            type="button"
+            onClick={() => {
+              if (!inCart) {
+                addToCart(service);
+              }
+            }}
+            disabled={inCart}
+            className={`w-full py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              inCart
+                ? 'bg-[#fef2ee] text-[#e03e1a] border border-[#f4c8ba] cursor-default'
+                : 'bg-[#e03e1a] hover:bg-[#c93514] text-white shadow-xs active:scale-[0.98]'
             }`}
           >
-            {active ? (
+            {inCart ? (
               <>
-                <Check className="w-3.5 h-3.5 text-[#e03e1a]" />
-                <span>Selected</span>
+                <Check className="w-4 h-4 text-[#e03e1a]" />
+                <span>Added</span>
               </>
             ) : (
               <>
-                <Plus className="w-3.5 h-3.5 text-amber-300" />
-                <span>Add Service</span>
+                <Plus className="w-4 h-4 text-white" />
+                <span>Add to Cart</span>
               </>
             )}
           </button>
+
+          <Link
+            to={`/service/${id}`}
+            className="text-[11px] font-medium text-stone-500 hover:text-[#e03e1a] hover:underline transition-colors py-0.5"
+          >
+            View Details
+          </Link>
         </div>
+
       </div>
     </div>
   );

@@ -31,13 +31,11 @@ export const PriceListModal: React.FC<PriceListModalProps> = ({ isOpen, onClose 
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#ebdccd] bg-white">
           <div className="flex items-center gap-3">
-            <div className="h-9 py-0.5">
-              <img
-                src="/assets/aistudio/image_031d6967.png"
-                alt="Hello Madam Logo"
-                className="h-full w-auto object-contain"
-              />
-            </div>
+            <img
+              src="/assets/aistudio/image_a7f9010e.png"
+              alt="Hello Madam Logo"
+              className="h-10 w-10 rounded-xl object-contain shadow-2xs border border-[#ebdccd]"
+            />
             <div className="border-l border-stone-200 pl-3">
               <h3 className="text-base font-serif font-bold text-stone-900">Official Service Rate Card</h3>
               <p className="text-[11px] text-stone-500">100% Transparent Doorstep Salon Pricing · Solapur</p>

@@ -1,395 +1,381 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Search, 
-  Sparkles, 
-  ShoppingBag, 
-  ArrowRight, 
-  SlidersHorizontal, 
-  Video, 
-  FileText, 
-  Clock, 
-  Check, 
-  Plus, 
-  Trash2,
-  Info
+  X, 
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
-import { CATEGORIES, ServiceItem } from '../data/servicesData';
-import { ServiceDetailModal } from '../components/ServiceDetailModal';
+import { CATEGORIES } from '../data/categories';
+import { SERVICES, Service } from '../data/services';
+import { ServiceCard } from '../components/ServiceCard';
 import { PriceListModal } from '../components/PriceListModal';
-import { useBooking } from '../context/BookingContext';
-import { useAdmin } from '../context/AdminContext';
-import { useLanguage } from '../context/LanguageContext';
 
 export const ServicesPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const initialCategory = searchParams.get('category') || 'all';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
-  const [activeModalService, setActiveModalService] = useState<ServiceItem | null>(null);
+  // Parse state from URL params, default sort to 'price-asc' (Price: Low to High)
+  const paramQ = searchParams.get('q') || '';
+  const paramCat = searchParams.get('cat') || searchParams.get('category') || 'all';
+  const paramSort = searchParams.get('sort') || 'price-asc';
+  const paramFocus = searchParams.get('focus');
+
+  const [searchQuery, setSearchQuery] = useState(paramQ);
+  const [selectedCategory, setSelectedCategory] = useState(paramCat);
+  const [sortBy, setSortBy] = useState(paramSort);
+  const [pageSize, setPageSize] = useState<number>(100);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [isPriceListOpen, setIsPriceListOpen] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  
-  const { services } = useAdmin();
-  const { selectedServices, totalAmount, toggleService, removeService, isSelected } = useBooking();
-  const { t, language } = useLanguage();
 
+  // Focus search input if ?focus=1 was passed
   useEffect(() => {
-    const cat = searchParams.get('category');
-    if (cat) {
-      setSelectedCategory(cat);
+    if (paramFocus && searchInputRef.current) {
+      searchInputRef.current.focus();
     }
-  }, [searchParams]);
+  }, [paramFocus]);
 
-  // Filter & Search Logic
+  // Keep local state in sync when URL query changes
+  useEffect(() => {
+    setSearchQuery(paramQ);
+    setSelectedCategory(paramCat);
+    setSortBy(paramSort);
+  }, [paramQ, paramCat, paramSort]);
+
+  // Update URL params whenever filters change
+  const updateParams = (updates: { q?: string; cat?: string; sort?: string }) => {
+    const nextQ = updates.q !== undefined ? updates.q : searchQuery;
+    const nextCat = updates.cat !== undefined ? updates.cat : selectedCategory;
+    const nextSort = updates.sort !== undefined ? updates.sort : sortBy;
+
+    const newParams = new URLSearchParams();
+    if (nextQ.trim()) newParams.set('q', nextQ.trim());
+    if (nextCat && nextCat !== 'all') newParams.set('cat', nextCat);
+    if (nextSort && nextSort !== 'price-asc') newParams.set('sort', nextSort);
+
+    setSearchParams(newParams, { replace: true });
+    setCurrentPage(1);
+  };
+
+  const handleCategoryChange = (catId: string) => {
+    setSelectedCategory(catId);
+    updateParams({ cat: catId });
+  };
+
+  const handleSortChange = (sort: string) => {
+    setSortBy(sort);
+    updateParams({ sort: sort });
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    updateParams({ q: query });
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('all');
+    setSortBy('price-asc');
+    setSearchParams(new URLSearchParams(), { replace: true });
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedCategory !== 'all' || sortBy !== 'price-asc';
+
+  // Compute category counts across all 91 services
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: SERVICES.length };
+    CATEGORIES.forEach(cat => {
+      counts[cat.id] = SERVICES.filter(s => s.category === cat.id).length;
+    });
+    return counts;
+  }, []);
+
+  // Filtered and sorted services (Default sort: Price Low to High)
   const filteredServices = useMemo(() => {
-    return services.filter((service) => {
-      const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory;
-      const matchesSearch = 
-        service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.categoryLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (service.subcategory && service.subcategory.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCategory && matchesSearch;
-    }).sort((a, b) => {
+    return SERVICES.filter((service: Service) => {
+      // Category filter
+      if (selectedCategory !== 'all' && service.category !== selectedCategory) {
+        return false;
+      }
+
+      // Text search
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = service.name.toLowerCase().includes(q);
+        const matchesCategory = service.category.toLowerCase().includes(q);
+        const matchesSub = service.sub ? service.sub.toLowerCase().includes(q) : false;
+        return matchesName || matchesCategory || matchesSub;
+      }
+
+      return true;
+    }).sort((a: Service, b: Service) => {
       if (sortBy === 'price-asc') return a.price - b.price;
       if (sortBy === 'price-desc') return b.price - a.price;
-      if (a.isPopular && !b.isPopular) return -1;
-      if (!a.isPopular && b.isPopular) return 1;
-      return 0;
+      if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
+      if (sortBy === 'featured') {
+        if (a.featured && !b.featured) return -1;
+        if (!a.featured && b.featured) return 1;
+        return a.price - b.price;
+      }
+      return a.price - b.price;
     });
-  }, [services, selectedCategory, searchQuery, sortBy]);
+  }, [selectedCategory, searchQuery, sortBy]);
+
+  // Pagination calculation
+  const totalEntries = filteredServices.length;
+  const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalEntries);
+  const paginatedServices = filteredServices.slice(startIndex, endIndex);
+
+  // Generate page numbers
+  const pageNumbers = useMemo(() => {
+    const pages: number[] = [];
+    const maxVisible = 5;
+    let start = Math.max(1, safeCurrentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }, [safeCurrentPage, totalPages]);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#faf7f2]">
       
       {/* 1. Header Banner */}
-      <section className="bg-white border-b border-[#ebdccd] pt-10 pb-12 sm:pb-16">
+      <section className="bg-white border-b border-[#ebdccd] pt-8 pb-6 sm:pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="max-w-3xl">
-              <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-[#e03e1a] uppercase mb-2 font-serif">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-[#e03e1a] uppercase mb-1.5 font-serif">
                 <Sparkles className="w-3.5 h-3.5 text-[#e03e1a]" />
-                <span>{language === 'hi' ? 'ऑफिशियल मूल्य सूची · सोलापूर' : 'Official Price Catalogue · Solapur'}</span>
+                <span>Ladies-Only Doorstep Salon · Solapur</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-stone-900 tracking-tight">
-                {language === 'hi' ? 'हमारी सेवाएं एवं रेट कार्ड' : 'Our Services & Price List'}
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-stone-900 tracking-tight">
+                Our Services &amp; Price List
               </h1>
-              <p className="mt-3 text-sm sm:text-base text-stone-600 leading-relaxed">
-                {language === 'hi'
-                  ? 'हेलो मैडम की सभी आधिकारिक सेवाएं। पारदर्शी दरें, प्रमाणित महिला ब्यूटीशियन और घर तक 100% सिंगल-यूज़ डिस्पोजेबल किट।'
-                  : 'Official pricing directly from Hello Madam. Transparent rates, verified female beauticians, and 100% single-use disposable kits delivered to your doorstep in Solapur.'}
+              <p className="mt-1.5 text-xs sm:text-sm text-stone-600 max-w-2xl leading-relaxed">
+                91 professional salon treatments delivered to your home. Certified female beauticians, 100% single-use disposable kits, and transparent pricing.
               </p>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <button
-                onClick={() => setIsPriceListOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-stone-900 bg-[#fef2ee] hover:bg-[#fae4dc] border border-[#f4c8ba] rounded-full transition-colors cursor-pointer shadow-2xs"
-              >
-                <FileText className="w-4 h-4 text-[#e03e1a]" />
-                <span>View Full Rate Card Table</span>
-              </button>
-
-              <Link
-                to="/our-work"
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-stone-700 bg-white hover:bg-stone-50 border border-[#ebdccd] rounded-full transition-colors"
-              >
-                <Video className="w-4 h-4 text-[#e03e1a]" />
-                <span>Watch Videos</span>
-              </Link>
-            </div>
+            <button
+              onClick={() => setIsPriceListOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-stone-800 bg-[#fef2ee] hover:bg-[#fae4dc] border border-[#f4c8ba] rounded-full transition-colors cursor-pointer shrink-0 self-start md:self-auto"
+            >
+              <span>View Rate Card Table</span>
+            </button>
           </div>
 
-          {/* Search & Sort Controls Bar */}
-          <div className="mt-8 flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          {/* Search Box & Sort Controls */}
+          <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-xl">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search threading, Rica wax, Hydra facial, hair spa..."
+                placeholder="Search any service (e.g. eyebrow threading, honey wax, fruit facial, bridal)..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-[#faf7f2] border border-[#ebdccd] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e03e1a]/20 focus:border-[#e03e1a] transition-all"
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full pl-10 pr-9 py-2.5 bg-[#faf7f2] border border-[#ebdccd] rounded-xl text-stone-900 placeholder-stone-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#e03e1a] focus:bg-white transition-all"
               />
               {searchQuery && (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-stone-400 hover:text-stone-700 cursor-pointer"
+                  onClick={() => handleSearchChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-700 rounded-full hover:bg-stone-200 transition-colors"
+                  aria-label="Clear search"
                 >
-                  Clear
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <SlidersHorizontal className="w-4 h-4 text-stone-400 hidden sm:inline" />
-              <label htmlFor="sort-services" className="text-xs text-stone-500 whitespace-nowrap">
-                Sort by:
-              </label>
-              <select
-                id="sort-services"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-2 text-xs font-medium text-stone-700 bg-[#faf7f2] border border-[#ebdccd] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e03e1a]/20 focus:border-[#e03e1a] cursor-pointer"
-              >
-                <option value="featured">Featured & Recommended</option>
-                <option value="price-asc">Price: Low to High</option>
-                <option value="price-desc">Price: High to Low</option>
-              </select>
-            </div>
-          </div>
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <span className="text-xs text-stone-500 font-medium hidden sm:inline">Sort by:</span>
+              <div className="relative inline-flex items-center">
+                <select
+                  value={sortBy}
+                  onChange={(e) => handleSortChange(e.target.value)}
+                  className="appearance-none bg-[#faf7f2] border border-[#ebdccd] rounded-xl pl-3 pr-8 py-2 text-xs font-semibold text-stone-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#e03e1a]"
+                >
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="featured">Featured / Spotlight</option>
+                  <option value="name-asc">Name: A to Z</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 pointer-events-none" />
+              </div>
 
-          {/* Category Filter Tabs */}
-          <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-2 text-xs font-bold rounded-full whitespace-nowrap transition-all shrink-0 cursor-pointer ${
-                  selectedCategory === cat.id
-                    ? 'bg-[#e03e1a] text-white shadow-xs'
-                    : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* 2. Services Grid */}
-      <section className="flex-1 py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="flex items-center justify-between mb-8">
-            <div className="text-xs text-stone-500 font-medium">
-              Showing <span className="font-bold text-stone-800 tabular-nums">{filteredServices.length}</span> official services
-              {selectedCategory !== 'all' && (
-                <span> in <span className="font-bold text-[#e03e1a]">{CATEGORIES.find(c => c.id === selectedCategory)?.label}</span></span>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs font-bold text-[#e03e1a] hover:underline cursor-pointer ml-1"
+                >
+                  Reset
+                </button>
               )}
             </div>
-
-            {selectedServices.length > 0 && (
-              <div className="hidden sm:flex items-center gap-3">
-                <span className="text-xs text-stone-600">
-                  <span className="font-bold text-stone-900">{selectedServices.length}</span> selected (₹{totalAmount.toLocaleString('en-IN')})
-                </span>
-                <Link
-                  to="/book"
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#e03e1a] hover:bg-[#b82e0e] rounded-full transition-colors flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-                  <span>Book Appointment</span>
-                </Link>
-              </div>
-            )}
           </div>
-
-          {filteredServices.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-3xl border border-[#ebdccd]">
-              <p className="text-base font-serif font-bold text-stone-800">No services match your search</p>
-              <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
-                Try searching for something else like "Eyebrow", "Rica Wax", "Hydra", or reset filters.
-              </p>
-              <button
-                onClick={() => {
-                  setSelectedCategory('all');
-                  setSearchQuery('');
-                }}
-                className="mt-4 px-4 py-2 text-xs font-bold text-white bg-[#e03e1a] hover:bg-[#b82e0e] rounded-full transition-colors cursor-pointer"
-              >
-                Reset Filters
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredServices.map((service) => {
-                const active = isSelected(service.id);
-                return (
-                  <div
-                    key={service.id}
-                    className="group flex flex-col bg-white rounded-3xl border border-[#ebdccd] overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                  >
-                    {/* Image Container */}
-                    <div className="relative aspect-4/3 w-full overflow-hidden bg-stone-100">
-                      <img
-                        src={service.image}
-                        alt={service.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-stone-950/40 via-transparent to-transparent opacity-60" />
-
-                      {service.subcategory && (
-                        <div className="absolute top-3 left-3 bg-stone-900/90 text-amber-200 text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md backdrop-blur-xs">
-                          {service.subcategory}
-                        </div>
-                      )}
-
-                      {service.featuredInVideo && !service.subcategory && (
-                        <div className="absolute top-3 left-3 bg-[#e03e1a]/95 text-white text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md shadow-xs">
-                          Featured in Video
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Card Body */}
-                    <div className="flex-1 flex flex-col p-6">
-                      <div className="flex items-center gap-2 text-xs text-stone-500 font-medium mb-1.5">
-                        <span className="text-[#e03e1a] font-bold uppercase tracking-wider text-[11px]">
-                          {service.categoryLabel}
-                        </span>
-                        <span aria-hidden="true" className="text-stone-300">·</span>
-                        <span className="flex items-center gap-1 text-stone-500">
-                          <Clock className="w-3.5 h-3.5 text-stone-400" />
-                          <span>{service.duration}</span>
-                        </span>
-                      </div>
-
-                      <h3 className="text-base font-serif font-bold text-stone-900 leading-snug line-clamp-2 min-h-11">
-                        {service.name}
-                      </h3>
-
-                      <p className="mt-2 text-xs text-stone-600 line-clamp-2 leading-relaxed flex-1">
-                        {service.description}
-                      </p>
-
-                      {/* Price & Action */}
-                      <div className="mt-5 pt-4 border-t border-[#ebdccd]/80 flex items-center justify-between gap-3">
-                        <div>
-                          <span className="text-[10px] text-stone-400 block font-serif uppercase">
-                            Official Rate
-                          </span>
-                          <span className="text-base sm:text-lg font-bold text-stone-900 tabular-nums font-serif">
-                            {service.priceDisplay || `₹${service.price.toLocaleString('en-IN')}`}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setActiveModalService(service)}
-                            className="p-2 rounded-xl text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer"
-                            title="View details"
-                          >
-                            <Info className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            onClick={() => toggleService(service)}
-                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                              active
-                                ? 'bg-[#fef2ee] text-[#e03e1a] border border-[#f4c8ba] shadow-2xs'
-                                : 'bg-stone-900 text-white hover:bg-[#e03e1a] shadow-2xs'
-                            }`}
-                          >
-                            {active ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-[#e03e1a]" />
-                                <span>Selected</span>
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-3.5 h-3.5 text-amber-300" />
-                                <span>Add</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
         </div>
       </section>
 
-      {/* 3. STICKY BOOKING SUMMARY DRAWER & BAR */}
-      {selectedServices.length > 0 && (
-        <div className="sticky bottom-6 z-30 max-w-2xl mx-auto px-4 w-full">
-          <div className="bg-[#1c1917] text-white rounded-3xl p-4 sm:p-5 shadow-2xl border border-stone-700 space-y-3">
-            
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#fef2ee]/15 text-amber-300 flex items-center justify-center shrink-0">
-                  <ShoppingBag className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                    <span>{selectedServices.length} {selectedServices.length === 1 ? 'Service' : 'Services'} Selected</span>
-                    <button
-                      onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-                      className="text-[11px] text-amber-300 underline font-medium hover:text-white cursor-pointer"
-                    >
-                      {isDrawerOpen ? 'Hide List' : 'View Itemized List'}
-                    </button>
-                  </div>
-                  <div className="text-xs text-stone-300 tabular-nums">
-                    Total Estimated Amount: <span className="font-bold text-amber-300 font-serif text-sm">₹{totalAmount.toLocaleString('en-IN')}</span>
-                  </div>
-                </div>
-              </div>
+      {/* 2. Category Chips Bar (Sticky) */}
+      <section className="sticky top-20 z-30 bg-[#faf7f2]/95 backdrop-blur-md border-b border-[#ebdccd] py-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              onClick={() => handleCategoryChange('all')}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                selectedCategory === 'all'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'bg-white text-stone-700 border border-[#ebdccd] hover:border-stone-400'
+              }`}
+            >
+              <span>All Services</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                selectedCategory === 'all' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'
+              }`}>
+                {categoryCounts.all}
+              </span>
+            </button>
 
-              <Link
-                to="/book"
-                className="px-6 py-2.5 text-xs font-bold text-white bg-[#e03e1a] hover:bg-[#b82e0e] rounded-full transition-all flex items-center gap-2 shadow-sm shrink-0"
-              >
-                <span>Continue to Booking</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            {/* Expandable Itemized List */}
-            {isDrawerOpen && (
-              <div className="pt-3 border-t border-stone-800 max-h-48 overflow-y-auto space-y-2 pr-1">
-                {selectedServices.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-stone-900/80"
-                  >
-                    <span className="text-stone-200 truncate pr-2">{s.name}</span>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="tabular-nums font-bold text-amber-300">
-                        {s.priceDisplay || `₹${s.price.toLocaleString('en-IN')}`}
-                      </span>
-                      <button
-                        onClick={() => removeService(s.id)}
-                        className="text-stone-400 hover:text-red-400 p-0.5 cursor-pointer"
-                        title="Remove"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
+            {CATEGORIES.map((cat) => {
+              const active = selectedCategory === cat.id;
+              const count = categoryCounts[cat.id] || 0;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => handleCategoryChange(cat.id)}
+                  className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    active
+                      ? 'bg-[#e03e1a] text-white shadow-xs'
+                      : 'bg-white text-stone-700 border border-[#ebdccd] hover:border-[#e03e1a]/40 hover:bg-[#fef2ee]/40'
+                  }`}
+                >
+                  <span>{cat.name}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    active ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Service Detail Modal */}
-      <ServiceDetailModal
-        service={activeModalService}
-        onClose={() => setActiveModalService(null)}
-        onSelectService={(s) => setActiveModalService(s)}
-      />
+      {/* 3. Main Services Grid: 4 cols on desktop, 3 on tablet, 2 on phones */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+        {paginatedServices.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-6">
+            {paginatedServices.map((service) => (
+              <ServiceCard key={service.id} service={service} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 px-4 bg-white rounded-2xl border border-[#ebdccd] max-w-md mx-auto my-8">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[#fef2ee] text-[#e03e1a] flex items-center justify-center mb-3">
+              <Search className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-serif font-bold text-stone-900 mb-1">
+              No services found
+            </h3>
+            <p className="text-xs text-stone-500 mb-4">
+              Try searching for another treatment or clear your filters.
+            </p>
+            <button
+              onClick={clearAllFilters}
+              className="px-4 py-2 bg-[#e03e1a] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#c93514] transition-colors cursor-pointer"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
 
-      {/* Full Official Price List Modal */}
+        {/* 4. Bottom Controls: Display Entries Selector, Showing X of Y, and Pagination */}
+        {totalEntries > 0 && (
+          <div className="mt-8 pt-6 border-t border-[#ebdccd] flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            {/* Display Entries Selector */}
+            <div className="flex items-center gap-2 text-xs text-stone-600">
+              <span>Display</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-white border border-[#ebdccd] rounded-lg px-2.5 py-1 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-[#e03e1a] cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>entries</span>
+            </div>
+
+            {/* Showing X to Y of Z entries */}
+            <div className="text-xs text-stone-500 font-medium">
+              Showing <strong className="text-stone-800 font-bold">{totalEntries === 0 ? 0 : startIndex + 1}</strong> to{' '}
+              <strong className="text-stone-800 font-bold">{endIndex}</strong> of{' '}
+              <strong className="text-stone-800 font-bold">{totalEntries}</strong> entries
+            </div>
+
+            {/* Pagination Buttons (Previous / page numbers / Next) */}
+            <div className="flex items-center gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={safeCurrentPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-[#ebdccd] bg-white text-stone-700 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors font-medium"
+              >
+                Previous
+              </button>
+
+              {pageNumbers.map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setCurrentPage(num)}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    safeCurrentPage === num
+                      ? 'bg-[#e03e1a] text-white shadow-xs'
+                      : 'bg-white border border-[#ebdccd] text-stone-700 hover:bg-stone-50'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                disabled={safeCurrentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg border border-[#ebdccd] bg-white text-stone-700 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors font-medium"
+              >
+                Next
+              </button>
+            </div>
+
+          </div>
+        )}
+      </main>
+
+      {/* Official Price List Modal */}
       <PriceListModal
         isOpen={isPriceListOpen}
         onClose={() => setIsPriceListOpen(false)}
       />
-
     </div>
   );
 };

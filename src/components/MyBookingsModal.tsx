@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
-import { X, Search, Calendar, Clock, MapPin, CheckCircle, Sparkles, Phone } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  X,
+  Search,
+  Calendar,
+  Clock,
+  MapPin,
+  CheckCircle,
+  Sparkles,
+  Phone,
+  ArrowRight,
+} from 'lucide-react';
 import { useBooking } from '../context/BookingContext';
 
 export const MyBookingsModal: React.FC = () => {
-  const { isMyBookingsOpen, setIsMyBookingsOpen, findBookingsByPhone, allBookings } = useBooking();
+  const {
+    isMyBookingsOpen,
+    setIsMyBookingsOpen,
+    findBookingsByPhone,
+    allBookings,
+  } = useBooking();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [searchPerformed, setSearchPerformed] = useState(false);
 
   if (!isMyBookingsOpen) return null;
 
-  const searchResults = searchPerformed && phoneNumber.trim().length >= 3
-    ? findBookingsByPhone(phoneNumber)
-    : allBookings.slice(0, 3); // show recent by default
+  const searchResults =
+    searchPerformed && phoneNumber.trim().length >= 3
+      ? findBookingsByPhone(phoneNumber)
+      : allBookings.slice(0, 3);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,11 +41,15 @@ export const MyBookingsModal: React.FC = () => {
         {/* Header with Official Monogram */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#ebdccd] bg-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#fef2ee] text-[#e03e1a] font-serif font-bold text-xs flex items-center justify-center border border-[#f4c8ba]">
-              HM
-            </div>
+            <img
+              src="/assets/aistudio/image_a7f9010e.png"
+              alt="Hello Madam Logo"
+              className="w-9 h-9 rounded-xl object-contain shadow-2xs border border-[#ebdccd]"
+            />
             <div>
-              <h3 className="text-base font-serif font-bold text-stone-900">Track My Appointment</h3>
+              <h3 className="text-base font-serif font-bold text-stone-900">
+                Track My Appointment
+              </h3>
               <p className="text-[11px] text-stone-500">Hello Madam Solapur</p>
             </div>
           </div>
@@ -41,14 +62,14 @@ export const MyBookingsModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar & Bookings List */}
         <div className="p-6 pb-3 bg-[#faf7f2] border-b border-[#ebdccd]">
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative flex-1">
               <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
               <input
                 type="tel"
-                placeholder="Enter 10-digit mobile number..."
+                placeholder="Filter by mobile number, name, or booking ID..."
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white border border-[#ebdccd] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e03e1a]/20 focus:border-[#e03e1a]"
@@ -62,17 +83,18 @@ export const MyBookingsModal: React.FC = () => {
               <span>Search</span>
             </button>
           </form>
-          <p className="mt-2 text-xs text-stone-500">
-            Tip: Try searching with <span className="font-mono font-bold text-stone-700">9657156795</span> or any number used during booking.
-          </p>
         </div>
 
         {/* Bookings List */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {searchResults.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm font-serif font-bold text-stone-700">No appointments found</p>
-              <p className="text-xs text-stone-500 mt-1">Please verify the mobile number or book a new appointment.</p>
+              <p className="text-sm font-serif font-bold text-stone-700">
+                No appointments found
+              </p>
+              <p className="text-xs text-stone-500 mt-1">
+                Book a doorstep appointment to see your schedule here.
+              </p>
             </div>
           ) : (
             searchResults.map((booking) => (
@@ -111,13 +133,26 @@ export const MyBookingsModal: React.FC = () => {
                     <MapPin className="w-3.5 h-3.5 text-[#e03e1a]" />
                     <span>{booking.customerDetails.area}, Solapur</span>
                   </div>
+                  <div className="flex items-center gap-2 pt-0.5 text-stone-700">
+                    <Sparkles className="w-3.5 h-3.5 text-[#e03e1a]" />
+                    <span>
+                      <strong>Assigned Beautician:</strong>{' '}
+                      {booking.assignedBeauticianName ||
+                        'Awaiting owner assignment'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-stone-100">
-                  <div className="text-[11px] text-stone-500 font-bold mb-1 font-serif">Services:</div>
+                  <div className="text-[11px] text-stone-500 font-bold mb-1 font-serif">
+                    Services:
+                  </div>
                   <div className="flex flex-wrap gap-1">
                     {booking.services.map((s) => (
-                      <span key={s.id} className="text-xs text-stone-700 bg-[#faf7f2] border border-[#ebdccd] px-2 py-0.5 rounded-md">
+                      <span
+                        key={s.id}
+                        className="text-xs text-stone-700 bg-[#faf7f2] border border-[#ebdccd] px-2 py-0.5 rounded-md"
+                      >
                         {s.name}
                       </span>
                     ))}
@@ -129,7 +164,15 @@ export const MyBookingsModal: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#ebdccd] bg-white flex justify-end">
+        <div className="p-4 border-t border-[#ebdccd] bg-white flex items-center justify-between">
+          <Link
+            to="/bookings"
+            onClick={() => setIsMyBookingsOpen(false)}
+            className="text-xs font-bold text-[#e03e1a] hover:underline inline-flex items-center gap-1"
+          >
+            <span>Open Full Bookings Page</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
           <button
             onClick={() => setIsMyBookingsOpen(false)}
             className="px-5 py-2 text-xs font-bold text-stone-700 hover:text-stone-900 transition-colors cursor-pointer"

@@ -1,0 +1,660 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Primitive Helpers
+    // -------------------------------------------------------------------------
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedOwner() {
+      return isVerified() && request.auth.token.email == 'shubhadabilla@gmail.com';
+    }
+
+    function isOwner() {
+      return isBootstrappedOwner() || (
+        isVerified() &&
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'owner' &&
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.active == true
+      );
+    }
+
+    function isBeautician() {
+      return isVerified() &&
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'beautician' &&
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.active == true;
+    }
+
+    function hasBeauticianInvite() {
+      return isVerified() &&
+        request.auth.token.email is string &&
+        exists(/databases/$(database)/documents/beautician_invites/$(request.auth.token.email)) &&
+        get(/databases/$(database)/documents/beautician_invites/$(request.auth.token.email)).data.active == true;
+    }
+
+    function strRange(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function optStr(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints (No existing()/diff() inside helpers)
+    // -------------------------------------------------------------------------
+    function isValidProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'fullName', 'role', 'active', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'fullName', 'phone', 'role', 'teamMemberId', 'active', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        strRange(data.email, 3, 160) &&
+        strRange(data.fullName, 1, 120) &&
+        optStr(data, 'phone', 30) &&
+        data.role in ['owner', 'beautician', 'customer'] &&
+        optStr(data, 'teamMemberId', 128) &&
+        data.active is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTeamMember(data) {
+      return data.keys().hasAll(['id', 'name', 'phone', 'whatsapp', 'specialties', 'workingDays', 'availabilityStatus', 'active', 'isVerified', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'uid', 'email', 'name', 'phone', 'whatsapp', 'photoUrl', 'specialties', 'workingDays', 'workingHoursStart', 'workingHoursEnd', 'availabilityStatus', 'active', 'isVerified', 'assignedCount', 'completedCount', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        optStr(data, 'uid', 128) &&
+        optStr(data, 'email', 160) &&
+        strRange(data.name, 1, 100) &&
+        strRange(data.phone, 5, 30) &&
+        strRange(data.whatsapp, 0, 30) &&
+        optStr(data, 'photoUrl', 500000) &&
+        data.specialties is list && data.specialties.size() <= 20 && (data.specialties.size() == 0 || data.specialties[0] is string) &&
+        data.workingDays is list && data.workingDays.size() <= 7 && (data.workingDays.size() == 0 || data.workingDays[0] is string) &&
+        optStr(data, 'workingHoursStart', 10) &&
+        optStr(data, 'workingHoursEnd', 10) &&
+        data.availabilityStatus in ['available', 'busy', 'on_leave'] &&
+        data.active is bool &&
+        data.isVerified is bool &&
+        (!('assignedCount' in data) || (data.assignedCount is number && data.assignedCount >= 0)) &&
+        (!('completedCount' in data) || (data.completedCount is number && data.completedCount >= 0)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPublicBeautician(data) {
+      return data.keys().hasAll(['id', 'name', 'specialties', 'availabilityStatus', 'active', 'isVerified', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'name', 'photoUrl', 'specialties', 'workingDays', 'workingHoursStart', 'workingHoursEnd', 'availabilityStatus', 'active', 'isVerified', 'verifiedPhone', 'updatedAt']) &&
+        isValidId(data.id) &&
+        strRange(data.name, 1, 100) &&
+        optStr(data, 'photoUrl', 500000) &&
+        data.specialties is list && data.specialties.size() <= 20 && (data.specialties.size() == 0 || data.specialties[0] is string) &&
+        (!('workingDays' in data) || (data.workingDays is list && data.workingDays.size() <= 7)) &&
+        optStr(data, 'workingHoursStart', 10) &&
+        optStr(data, 'workingHoursEnd', 10) &&
+        data.availabilityStatus in ['available', 'busy', 'on_leave'] &&
+        data.active is bool &&
+        data.isVerified is bool &&
+        optStr(data, 'verifiedPhone', 30) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBeauticianInvite(data) {
+      return data.keys().hasAll(['email', 'teamMemberId', 'active', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['email', 'teamMemberId', 'active', 'createdAt', 'updatedAt']) &&
+        strRange(data.email, 3, 160) &&
+        isValidId(data.teamMemberId) &&
+        data.active is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBeauticianAvailability(data) {
+      return data.keys().hasAll(['id', 'beauticianId', 'date', 'blockedSlots', 'isDayOff', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'beauticianId', 'beauticianUid', 'date', 'blockedSlots', 'isDayOff', 'note', 'updatedAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.beauticianId) &&
+        optStr(data, 'beauticianUid', 128) &&
+        strRange(data.date, 10, 10) && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+        data.blockedSlots is list && data.blockedSlots.size() <= 12 && (data.blockedSlots.size() == 0 || data.blockedSlots[0] is string) &&
+        data.isDayOff is bool &&
+        optStr(data, 'note', 300) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['id', 'fullName', 'phone', 'address', 'totalAppointments', 'completedAppointments', 'totalCompletedSpending', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'uid', 'fullName', 'phone', 'whatsapp', 'email', 'address', 'area', 'landmark', 'totalAppointments', 'completedAppointments', 'totalCompletedSpending', 'frequentServices', 'lastAppointmentDate', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        optStr(data, 'uid', 128) &&
+        strRange(data.fullName, 1, 120) &&
+        strRange(data.phone, 8, 20) &&
+        optStr(data, 'whatsapp', 20) &&
+        optStr(data, 'email', 160) &&
+        strRange(data.address, 2, 500) &&
+        optStr(data, 'area', 120) &&
+        optStr(data, 'landmark', 200) &&
+        data.totalAppointments is number && data.totalAppointments >= 0 &&
+        data.completedAppointments is number && data.completedAppointments >= 0 &&
+        data.totalCompletedSpending is number && data.totalCompletedSpending >= 0 &&
+        (!('frequentServices' in data) || (data.frequentServices is list && data.frequentServices.size() <= 20)) &&
+        optStr(data, 'lastAppointmentDate', 30) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidServiceCategory(data) {
+      return data.keys().hasAll(['id', 'label', 'active', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'label', 'description', 'image', 'displayOrder', 'active', 'updatedAt']) &&
+        isValidId(data.id) &&
+        strRange(data.label, 1, 100) &&
+        optStr(data, 'description', 500) &&
+        optStr(data, 'image', 500) &&
+        (!('displayOrder' in data) || data.displayOrder is number) &&
+        data.active is bool &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidServiceItem(data) {
+      return data.keys().hasAll(['id', 'name', 'category', 'price', 'durationMins', 'active', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'name', 'category', 'categoryLabel', 'subcategory', 'description', 'price', 'durationMins', 'duration', 'image', 'isFeatured', 'isPopular', 'active', 'updatedAt']) &&
+        isValidId(data.id) &&
+        strRange(data.name, 1, 180) &&
+        strRange(data.category, 1, 80) &&
+        optStr(data, 'categoryLabel', 100) &&
+        optStr(data, 'subcategory', 100) &&
+        optStr(data, 'description', 1000) &&
+        data.price is number && data.price >= 0 &&
+        data.durationMins is number && data.durationMins >= 0 &&
+        optStr(data, 'duration', 40) &&
+        optStr(data, 'image', 500000) &&
+        (!('isFeatured' in data) || data.isFeatured is bool) &&
+        (!('isPopular' in data) || data.isPopular is bool) &&
+        data.active is bool &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBeautyPackage(data) {
+      return data.keys().hasAll(['id', 'name', 'includedServiceIds', 'isOfficialOffer', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'name', 'tagline', 'description', 'packagePrice', 'includedServiceIds', 'image', 'isOfficialOffer', 'updatedAt']) &&
+        isValidId(data.id) &&
+        strRange(data.name, 1, 160) &&
+        optStr(data, 'tagline', 200) &&
+        optStr(data, 'description', 1000) &&
+        (!('packagePrice' in data) || (data.packagePrice is number && data.packagePrice >= 0)) &&
+        data.includedServiceIds is list && data.includedServiceIds.size() <= 30 && (data.includedServiceIds.size() == 0 || data.includedServiceIds[0] is string) &&
+        optStr(data, 'image', 500000) &&
+        data.isOfficialOffer is bool &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBusinessOffer(data) {
+      return data.keys().hasAll(['id', 'title', 'isActive', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'badge', 'title', 'subtitle', 'description', 'isActive', 'updatedAt']) &&
+        isValidId(data.id) &&
+        optStr(data, 'badge', 80) &&
+        strRange(data.title, 1, 160) &&
+        optStr(data, 'subtitle', 240) &&
+        optStr(data, 'description', 1000) &&
+        data.isActive is bool &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll([
+          'id', 'bookingReference', 'customerId', 'customerUid', 'customerName',
+          'customerPhone', 'customerAddress', 'preferredBeauticianId', 'preferredBeauticianName',
+          'assignedBeauticianId', 'appointmentDate', 'timeSlot', 'items',
+          'estimatedTotal', 'totalDurationMins', 'status', 'assignmentStatus',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'bookingReference', 'customerId', 'customerUid', 'customerName',
+          'customerPhone', 'customerWhatsapp', 'customerEmail', 'customerAddress',
+          'customerArea', 'landmark', 'customerInstructions',
+          'preferredBeauticianId', 'preferredBeauticianName',
+          'assignedBeauticianId', 'assignedBeauticianName', 'assignedBeauticianPhone',
+          'assignedBeauticianUid', 'assignedBeauticianEmail',
+          'appointmentDate', 'startTime', 'endTime', 'timeSlot',
+          'items', 'estimatedTotal', 'totalDurationMins', 'status', 'assignmentStatus',
+          'beauticianNote', 'adminNotes', 'rejectionReason', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        strRange(data.bookingReference, 4, 40) &&
+        strRange(data.customerId, 1, 128) &&
+        strRange(data.customerUid, 1, 128) &&
+        strRange(data.customerName, 1, 120) &&
+        strRange(data.customerPhone, 8, 20) &&
+        optStr(data, 'customerWhatsapp', 20) &&
+        optStr(data, 'customerEmail', 160) &&
+        strRange(data.customerAddress, 2, 500) &&
+        optStr(data, 'customerArea', 120) &&
+        optStr(data, 'landmark', 200) &&
+        optStr(data, 'customerInstructions', 600) &&
+        strRange(data.preferredBeauticianId, 1, 128) &&
+        strRange(data.preferredBeauticianName, 1, 120) &&
+        strRange(data.assignedBeauticianId, 0, 128) &&
+        optStr(data, 'assignedBeauticianName', 120) &&
+        optStr(data, 'assignedBeauticianPhone', 30) &&
+        optStr(data, 'assignedBeauticianUid', 128) &&
+        optStr(data, 'assignedBeauticianEmail', 160) &&
+        strRange(data.appointmentDate, 10, 10) && data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+        optStr(data, 'startTime', 20) &&
+        optStr(data, 'endTime', 20) &&
+        strRange(data.timeSlot, 3, 60) &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 50 && data.items[0] is map &&
+        data.estimatedTotal is number && data.estimatedTotal >= 0 &&
+        data.totalDurationMins is number && data.totalDurationMins >= 0 &&
+        data.status in ['pending', 'confirmed', 'assigned', 'in_progress', 'completed', 'cancelled', 'reschedule_requested', 'customer_unavailable'] &&
+        data.assignmentStatus in ['unassigned', 'assigned', 'reassigned'] &&
+        optStr(data, 'beauticianNote', 500) &&
+        optStr(data, 'adminNotes', 500) &&
+        optStr(data, 'rejectionReason', 500) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAppointmentAssignment(data) {
+      return data.keys().hasAll(['id', 'appointmentId', 'bookingReference', 'beauticianId', 'beauticianName', 'assignedByUid', 'action', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'appointmentId', 'bookingReference', 'previousBeauticianId', 'previousBeauticianName', 'beauticianId', 'beauticianName', 'beauticianUid', 'beauticianEmail', 'assignedByUid', 'action', 'note', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.appointmentId) &&
+        strRange(data.bookingReference, 4, 40) &&
+        optStr(data, 'previousBeauticianId', 128) &&
+        optStr(data, 'previousBeauticianName', 120) &&
+        strRange(data.beauticianId, 1, 128) &&
+        strRange(data.beauticianName, 1, 120) &&
+        optStr(data, 'beauticianUid', 128) &&
+        optStr(data, 'beauticianEmail', 160) &&
+        strRange(data.assignedByUid, 1, 128) &&
+        data.action in ['assigned', 'reassigned', 'unassigned'] &&
+        optStr(data, 'note', 400) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidBookingStatusHistory(data) {
+      return data.keys().hasAll(['id', 'appointmentId', 'bookingReference', 'toStatus', 'changedByUid', 'changedByRole', 'changedByName', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'appointmentId', 'bookingReference', 'fromStatus', 'toStatus', 'changedByUid', 'changedByRole', 'changedByName', 'customerUid', 'assignedBeauticianUid', 'assignedBeauticianEmail', 'note', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.appointmentId) &&
+        strRange(data.bookingReference, 4, 40) &&
+        optStr(data, 'fromStatus', 30) &&
+        strRange(data.toStatus, 1, 30) &&
+        strRange(data.changedByUid, 1, 128) &&
+        data.changedByRole in ['owner', 'beautician', 'customer'] &&
+        strRange(data.changedByName, 1, 120) &&
+        optStr(data, 'customerUid', 128) &&
+        optStr(data, 'assignedBeauticianUid', 128) &&
+        optStr(data, 'assignedBeauticianEmail', 160) &&
+        optStr(data, 'note', 500) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidNotificationLog(data) {
+      return data.keys().hasAll(['id', 'appointmentId', 'bookingReference', 'eventType', 'recipientRole', 'recipientName', 'recipientContact', 'channel', 'status', 'createdByUid', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'appointmentId', 'bookingReference', 'eventType', 'recipientRole', 'recipientName', 'recipientContact', 'channel', 'status', 'providerMessageId', 'errorMessage', 'payloadSummary', 'createdByUid', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.appointmentId) &&
+        strRange(data.bookingReference, 4, 40) &&
+        strRange(data.eventType, 1, 60) &&
+        data.recipientRole in ['owner', 'beautician', 'customer'] &&
+        strRange(data.recipientName, 1, 120) &&
+        strRange(data.recipientContact, 3, 160) &&
+        data.channel in ['whatsapp', 'email'] &&
+        data.status in ['delivered', 'failed', 'not_configured'] &&
+        optStr(data, 'providerMessageId', 200) &&
+        optStr(data, 'errorMessage', 500) &&
+        optStr(data, 'payloadSummary', 600) &&
+        strRange(data.createdByUid, 1, 128) &&
+        data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    // 1. User Profiles & RBAC
+    match /profiles/{uid} {
+      allow get: if isValidId(uid) && isVerified() && (request.auth.uid == uid || isOwner());
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidId(uid) && isVerified() && isValidProfile(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          (
+            request.auth.uid == uid &&
+            incoming().uid == request.auth.uid &&
+            incoming().email == request.auth.token.email &&
+            incoming().active == true && (
+              incoming().role == 'customer' ||
+              (incoming().role == 'beautician' && hasBeauticianInvite()) ||
+              (incoming().role == 'owner' && isBootstrappedOwner())
+            )
+          )
+        );
+
+      allow update: if isValidId(uid) && isVerified() && isValidProfile(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().uid == existing().uid && (
+          isOwner() ||
+          (
+            request.auth.uid == uid &&
+            incoming().role == existing().role &&
+            incoming().active == existing().active &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phone', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(uid) && isOwner();
+    }
+
+    // 2. Beautician Team Members (Confidential HR records)
+    match /team_members/{memberId} {
+      allow get: if isValidId(memberId) && isVerified() && (
+        isOwner() ||
+        (isBeautician() && (existing().uid == request.auth.uid || existing().email == request.auth.token.email))
+      );
+      allow list: if isBootstrappedOwner() || (
+        isVerified() && (resource.data.uid == request.auth.uid || resource.data.email == request.auth.token.email)
+      );
+
+      allow create: if isValidId(memberId) && isOwner() && isValidTeamMember(incoming()) &&
+        incoming().id == memberId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(memberId) && isVerified() && isValidTeamMember(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          (
+            isBeautician() &&
+            (existing().uid == request.auth.uid || existing().email == request.auth.token.email) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['uid', 'availabilityStatus', 'workingDays', 'updatedAt']) &&
+            incoming().uid == request.auth.uid
+          )
+        );
+
+      allow delete: if isValidId(memberId) && isOwner();
+    }
+
+    // 3. Public Beautician Cards (Non-sensitive display for Booking & Showcase)
+    match /public_beauticians/{memberId} {
+      allow get: if isValidId(memberId);
+      allow list: if true;
+      allow create: if isValidId(memberId) && isOwner() && isValidPublicBeautician(incoming()) &&
+        incoming().id == memberId && incoming().updatedAt == request.time;
+      allow update: if isValidId(memberId) && isVerified() && isValidPublicBeautician(incoming()) &&
+        incoming().id == existing().id && incoming().updatedAt == request.time && (
+          isOwner() ||
+          (
+            isBeautician() &&
+            exists(/databases/$(database)/documents/team_members/$(memberId)) &&
+            (
+              get(/databases/$(database)/documents/team_members/$(memberId)).data.uid == request.auth.uid ||
+              get(/databases/$(database)/documents/team_members/$(memberId)).data.email == request.auth.token.email
+            ) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['availabilityStatus', 'workingDays', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(memberId) && isOwner();
+    }
+
+    // 4. Beautician Invites (Owner-created login email binding)
+    match /beautician_invites/{emailId} {
+      allow get: if isVerified() && (isOwner() || request.auth.token.email.lower() == emailId.lower());
+      allow list: if isBootstrappedOwner();
+      allow create, update: if isOwner() && isValidBeauticianInvite(incoming()) &&
+        incoming().updatedAt == request.time;
+      allow delete: if isOwner();
+    }
+
+    // 5. Beautician Availability
+    match /beautician_availability/{availId} {
+      allow get: if isValidId(availId);
+      allow list: if true;
+      allow create: if isValidId(availId) && isVerified() && isValidBeauticianAvailability(incoming()) &&
+        incoming().id == availId &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          (isBeautician() && incoming().beauticianUid == request.auth.uid)
+        );
+      allow update: if isValidId(availId) && isVerified() && isValidBeauticianAvailability(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          (
+            isBeautician() &&
+            existing().beauticianUid == request.auth.uid &&
+            incoming().beauticianUid == existing().beauticianUid &&
+            incoming().beauticianId == existing().beauticianId &&
+            incoming().date == existing().date
+          )
+        );
+      allow delete: if isValidId(availId) && isOwner();
+    }
+
+    // 6. Customers Directory (Strict PII Isolation)
+    match /customers/{customerId} {
+      allow get: if isValidId(customerId) && isVerified() && (
+        isOwner() || existing().uid == request.auth.uid
+      );
+      allow list: if isBootstrappedOwner() || (
+        isVerified() && resource.data.uid == request.auth.uid
+      );
+
+      allow create: if isValidId(customerId) && isVerified() && isValidCustomer(incoming()) &&
+        incoming().id == customerId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          (
+            incoming().uid == request.auth.uid &&
+            incoming().completedAppointments == 0 &&
+            incoming().totalCompletedSpending == 0
+          )
+        );
+
+      allow update: if isValidId(customerId) && isVerified() && isValidCustomer(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          (
+            existing().uid == request.auth.uid &&
+            incoming().uid == existing().uid &&
+            incoming().completedAppointments == existing().completedAppointments &&
+            incoming().totalCompletedSpending == existing().totalCompletedSpending &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phone', 'whatsapp', 'email', 'address', 'area', 'landmark', 'totalAppointments', 'lastAppointmentDate', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(customerId) && isOwner();
+    }
+
+    // 7. Service Categories, Services, Packages, Offers (Public Read, Owner Write)
+    match /service_categories/{categoryId} {
+      allow get: if isValidId(categoryId);
+      allow list: if true;
+      allow create, update: if isValidId(categoryId) && isOwner() && isValidServiceCategory(incoming()) &&
+        incoming().id == categoryId && incoming().updatedAt == request.time;
+      allow delete: if isValidId(categoryId) && isOwner();
+    }
+
+    match /services/{serviceId} {
+      allow get: if isValidId(serviceId);
+      allow list: if true;
+      allow create, update: if isValidId(serviceId) && isOwner() && isValidServiceItem(incoming()) &&
+        incoming().id == serviceId && incoming().updatedAt == request.time;
+      allow delete: if isValidId(serviceId) && isOwner();
+    }
+
+    match /packages/{packageId} {
+      allow get: if isValidId(packageId);
+      allow list: if true;
+      allow create, update: if isValidId(packageId) && isOwner() && isValidBeautyPackage(incoming()) &&
+        incoming().id == packageId && incoming().updatedAt == request.time;
+      allow delete: if isValidId(packageId) && isOwner();
+    }
+
+    match /offers/{offerId} {
+      allow get: if isValidId(offerId);
+      allow list: if true;
+      allow create, update: if isValidId(offerId) && isOwner() && isValidBusinessOffer(incoming()) &&
+        incoming().id == offerId && incoming().updatedAt == request.time;
+      allow delete: if isValidId(offerId) && isOwner();
+    }
+
+    // 8. Appointments (Core RBAC + State Machine)
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && isVerified() && (
+        isOwner() ||
+        existing().customerUid == request.auth.uid ||
+        (
+          isBeautician() &&
+          existing().assignedBeauticianId != '' &&
+          (existing().assignedBeauticianUid == request.auth.uid || existing().assignedBeauticianEmail == request.auth.token.email)
+        )
+      );
+
+      // Zero-lookup list query enforcement (single-field index compatible)
+      allow list: if isBootstrappedOwner() || (
+        isVerified() && (
+          resource.data.customerUid == request.auth.uid ||
+          resource.data.assignedBeauticianUid == request.auth.uid ||
+          resource.data.assignedBeauticianEmail == request.auth.token.email
+        )
+      );
+
+      // Customer creates pending unassigned request (or Owner creates)
+      allow create: if isValidId(appointmentId) && isVerified() && isValidAppointment(incoming()) &&
+        incoming().id == appointmentId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          (
+            incoming().customerUid == request.auth.uid &&
+            incoming().status == 'pending' &&
+            incoming().assignedBeauticianId == '' &&
+            incoming().assignmentStatus == 'unassigned' &&
+            (!('assignedBeauticianUid' in incoming()) || incoming().assignedBeauticianUid == '') &&
+            (!('assignedBeauticianEmail' in incoming()) || incoming().assignedBeauticianEmail == '')
+          )
+        );
+
+      // Action-Based Updates with Terminal Locking
+      allow update: if isValidId(appointmentId) && isVerified() && isValidAppointment(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().bookingReference == existing().bookingReference &&
+        incoming().customerUid == existing().customerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isOwner() ||
+          // Beautician Actions (only on assigned non-terminal appointments)
+          (
+            isBeautician() &&
+            existing().assignedBeauticianId != '' &&
+            (existing().assignedBeauticianUid == request.auth.uid || existing().assignedBeauticianEmail == request.auth.token.email) &&
+            !(existing().status in ['completed', 'cancelled']) &&
+            incoming().assignedBeauticianId == existing().assignedBeauticianId &&
+            incoming().preferredBeauticianId == existing().preferredBeauticianId &&
+            incoming().estimatedTotal == existing().estimatedTotal &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'beauticianNote', 'updatedAt']) &&
+            (
+              (existing().status in ['assigned', 'confirmed'] && incoming().status in ['in_progress', 'reschedule_requested', 'customer_unavailable']) ||
+              (existing().status == 'in_progress' && incoming().status in ['completed', 'reschedule_requested', 'customer_unavailable'])
+            )
+          ) ||
+          // Customer Cancel Action (only before completion)
+          (
+            existing().customerUid == request.auth.uid &&
+            existing().status in ['pending', 'confirmed', 'assigned'] &&
+            incoming().status == 'cancelled' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(appointmentId) && isOwner();
+    }
+
+    // 9. Appointment Assignments History
+    match /appointment_assignments/{assignmentId} {
+      allow get: if isValidId(assignmentId) && isVerified() && (
+        isOwner() ||
+        (isBeautician() && (existing().beauticianUid == request.auth.uid || existing().beauticianEmail == request.auth.token.email))
+      );
+      allow list: if isBootstrappedOwner() || (
+        isVerified() && (resource.data.beauticianUid == request.auth.uid || resource.data.beauticianEmail == request.auth.token.email)
+      );
+      allow create: if isValidId(assignmentId) && isOwner() && isValidAppointmentAssignment(incoming()) &&
+        incoming().id == assignmentId && incoming().createdAt == request.time;
+      allow update, delete: if isValidId(assignmentId) && isOwner();
+    }
+
+    // 10. Booking Status History
+    match /booking_status_history/{historyId} {
+      allow get: if isValidId(historyId) && isVerified() && (
+        isOwner() ||
+        existing().changedByUid == request.auth.uid ||
+        existing().customerUid == request.auth.uid ||
+        existing().assignedBeauticianUid == request.auth.uid ||
+        existing().assignedBeauticianEmail == request.auth.token.email
+      );
+      allow list: if isBootstrappedOwner() || (
+        isVerified() && (
+          resource.data.changedByUid == request.auth.uid ||
+          resource.data.customerUid == request.auth.uid ||
+          resource.data.assignedBeauticianUid == request.auth.uid ||
+          resource.data.assignedBeauticianEmail == request.auth.token.email
+        )
+      );
+      allow create: if isValidId(historyId) && isVerified() && isValidBookingStatusHistory(incoming()) &&
+        incoming().id == historyId &&
+        incoming().changedByUid == request.auth.uid &&
+        incoming().createdAt == request.time && (
+          isOwner() ||
+          (isBeautician() && incoming().changedByRole == 'beautician') ||
+          incoming().changedByRole == 'customer'
+        );
+      allow update, delete: if isValidId(historyId) && isOwner();
+    }
+
+    // 11. Notification Logs
+    match /notification_logs/{logId} {
+      allow get: if isValidId(logId) && isOwner();
+      allow list: if isBootstrappedOwner();
+      allow create: if isValidId(logId) && isVerified() && isValidNotificationLog(incoming()) &&
+        incoming().id == logId &&
+        incoming().createdByUid == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update, delete: if isValidId(logId) && isOwner();
+    }
+  }
+}

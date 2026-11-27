@@ -52,6 +52,13 @@ export const ContactPage: React.FC = () => {
       {/* 1. Header Banner */}
       <section className="bg-white border-b border-[#ebdccd] pt-12 pb-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
+          <div className="flex justify-center mb-1">
+            <img
+              src="/assets/aistudio/image_a7f9010e.png"
+              alt="Hello Madam Official Brand Logo"
+              className="h-14 w-14 rounded-2xl object-contain shadow-md border border-white/60"
+            />
+          </div>
           <div className="inline-flex items-center gap-2 text-xs font-bold tracking-wider text-[#e03e1a] uppercase font-serif">
             <Sparkles className="w-3.5 h-3.5 text-[#e03e1a]" />
             <span>Connect with Hello Madam Solapur</span>

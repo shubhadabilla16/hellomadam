@@ -17,12 +17,20 @@ export const Footer: React.FC = () => {
           
           {/* Col 1: Brand & Logo (Spans 2 cols on lg) */}
           <div className="lg:col-span-2 space-y-5">
-            <Link to="/" className="inline-block bg-white p-2.5 rounded-2xl border border-stone-700 shadow-sm">
+            <Link to="/" className="inline-flex items-center gap-3 group">
               <img
-                src="/assets/aistudio/image_031d6967.png"
-                alt="Hello Madam Original Brand Logo"
-                className="h-12 w-auto object-contain"
+                src="/assets/aistudio/image_a7f9010e.png"
+                alt="Hello Madam Official Brand Logo"
+                className="h-14 w-14 rounded-2xl object-contain shadow-md border border-white/20 transition-transform group-hover:scale-105"
               />
+              <div className="flex flex-col">
+                <span className="font-serif font-black tracking-tight text-2xl text-white leading-none uppercase">
+                  Hello Madam
+                </span>
+                <span className="text-[11px] font-semibold text-stone-400 tracking-wider uppercase mt-1">
+                  Ladies Salon At Home · Solapur
+                </span>
+              </div>
             </Link>
             
             <p className="text-sm text-stone-400 leading-relaxed max-w-sm">
@@ -41,50 +49,78 @@ export const Footer: React.FC = () => {
               >
                 Owner Portal
               </Link>
+              <Link
+                to="/beautician/login"
+                className="text-[11px] font-medium text-stone-500 hover:text-stone-300 underline"
+              >
+                Beautician Login
+              </Link>
             </div>
           </div>
 
           {/* Col 2: Service Categories & Popular Services */}
           <div className="space-y-4">
-            <h4 className="text-sm font-serif font-bold tracking-wider uppercase text-white">Popular Services</h4>
+            <h4 className="text-sm font-serif font-bold tracking-wider uppercase text-white">Popular Categories</h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-stone-400">
-              {popularCategoryKeys.map((catKey) => {
-                const cat = CATEGORY_MEDIA_MAP[catKey];
-                if (!cat) return null;
-                return (
-                  <li key={cat.id}>
-                    <Link
-                      to={`/services?category=${cat.id}`}
-                      className="hover:text-amber-200 transition-colors"
-                    >
-                      {cat.name}
-                    </Link>
-                  </li>
-                );
-              })}
               <li>
-                <Link to="/#packages" className="text-[#e03e1a] hover:text-[#f45f3d] font-semibold transition-colors">
-                  View Beauty Packages
+                <Link to="/services/facial" className="hover:text-amber-200 transition-colors">
+                  Facial Treatments &amp; Korean Glow
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/body-wax" className="hover:text-amber-200 transition-colors">
+                  Honey &amp; Rica Waxing
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/clean-up" className="hover:text-amber-200 transition-colors">
+                  Clean-up &amp; Pore Purification
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/d-tan" className="hover:text-amber-200 transition-colors">
+                  D-Tan Therapy
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/hair-spa" className="hover:text-amber-200 transition-colors">
+                  Hair Spa Rituals
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/bridal" className="hover:text-amber-200 transition-colors">
+                  Makeup &amp; Bridal Artistry
+                </Link>
+              </li>
+              <li>
+                <Link to="/services" className="text-[#e03e1a] hover:text-[#f45f3d] font-semibold transition-colors">
+                  Explore All 16 Categories &rarr;
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Col 3: Quick Navigation & Legal */}
+          {/* Col 3: Quick Navigation & Customer Links */}
           <div className="space-y-4">
-            <h4 className="text-sm font-serif font-bold tracking-wider uppercase text-white">Company</h4>
+            <h4 className="text-sm font-serif font-bold tracking-wider uppercase text-white">Navigation</h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-stone-400">
               <li>
                 <Link to="/" className="hover:text-amber-200 transition-colors">Home</Link>
               </li>
               <li>
+                <Link to="/services" className="hover:text-amber-200 transition-colors">91 Services Catalogue</Link>
+              </li>
+              <li>
+                <Link to="/packages" className="hover:text-amber-200 transition-colors">Curated Packages</Link>
+              </li>
+              <li>
+                <Link to="/bookings" className="hover:text-amber-200 transition-colors">My Bookings</Link>
+              </li>
+              <li>
+                <Link to="/favourites" className="hover:text-amber-200 transition-colors">Saved Favourites</Link>
+              </li>
+              <li>
                 <Link to="/about" className="hover:text-amber-200 transition-colors">About Us</Link>
-              </li>
-              <li>
-                <Link to="/services" className="hover:text-amber-200 transition-colors">Our Services</Link>
-              </li>
-              <li>
-                <Link to="/our-work" className="hover:text-amber-200 transition-colors">Our Work (Videos)</Link>
               </li>
               <li>
                 <Link to="/contact" className="hover:text-amber-200 transition-colors">Contact</Link>

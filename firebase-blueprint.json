@@ -1,0 +1,376 @@
+{
+  "entities": {
+    "Profile": {
+      "title": "Profile",
+      "description": "Authenticated user role and identity profile linking Firebase Auth UID to owner, beautician, or customer role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 160 },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "role": { "type": "string", "enum": ["owner", "beautician", "customer"], "maxLength": 20 },
+        "teamMemberId": { "type": "string", "maxLength": 128 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "fullName", "role", "active", "createdAt", "updatedAt"]
+    },
+    "TeamMember": {
+      "title": "TeamMember",
+      "description": "Beautician workforce profile managed by the owner, including contact details, specializations, schedule, and login email.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 160 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "phone": { "type": "string", "minLength": 5, "maxLength": 30 },
+        "whatsapp": { "type": "string", "maxLength": 30 },
+        "photoUrl": { "type": "string", "maxLength": 500000 },
+        "specialties": { "type": "array" },
+        "workingDays": { "type": "array" },
+        "workingHoursStart": { "type": "string", "maxLength": 10 },
+        "workingHoursEnd": { "type": "string", "maxLength": 10 },
+        "availabilityStatus": { "type": "string", "enum": ["available", "busy", "on_leave"], "maxLength": 20 },
+        "active": { "type": "boolean" },
+        "isVerified": { "type": "boolean" },
+        "assignedCount": { "type": "number" },
+        "completedCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "phone", "whatsapp", "specialties", "workingDays", "availabilityStatus", "active", "isVerified", "createdAt", "updatedAt"]
+    },
+    "PublicBeautician": {
+      "title": "PublicBeautician",
+      "description": "Publicly browsable beautician profile card for customer service discovery and booking preference selection.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "photoUrl": { "type": "string", "maxLength": 500000 },
+        "specialties": { "type": "array" },
+        "workingDays": { "type": "array" },
+        "workingHoursStart": { "type": "string", "maxLength": 10 },
+        "workingHoursEnd": { "type": "string", "maxLength": 10 },
+        "availabilityStatus": { "type": "string", "enum": ["available", "busy", "on_leave"], "maxLength": 20 },
+        "active": { "type": "boolean" },
+        "isVerified": { "type": "boolean" },
+        "verifiedPhone": { "type": "string", "maxLength": 30 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "specialties", "availabilityStatus", "active", "isVerified", "updatedAt"]
+    },
+    "BeauticianInvite": {
+      "title": "BeauticianInvite",
+      "description": "Owner-issued authorization mapping a verified email address to a team member profile.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "teamMemberId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "teamMemberId", "active", "createdAt", "updatedAt"]
+    },
+    "BeauticianAvailability": {
+      "title": "BeauticianAvailability",
+      "description": "Date-specific availability overrides and blocked time slots for a beautician.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "beauticianId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "beauticianUid": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "minLength": 10, "maxLength": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "blockedSlots": { "type": "array" },
+        "isDayOff": { "type": "boolean" },
+        "note": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "beauticianId", "date", "blockedSlots", "isDayOff", "updatedAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer profile and aggregated spending/appointment metrics stored for owner CRM and customer self-access.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "uid": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "phone": { "type": "string", "minLength": 8, "maxLength": 20 },
+        "whatsapp": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "maxLength": 160 },
+        "address": { "type": "string", "minLength": 2, "maxLength": 500 },
+        "area": { "type": "string", "maxLength": 120 },
+        "landmark": { "type": "string", "maxLength": 200 },
+        "totalAppointments": { "type": "number" },
+        "completedAppointments": { "type": "number" },
+        "totalCompletedSpending": { "type": "number" },
+        "frequentServices": { "type": "array" },
+        "lastAppointmentDate": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "fullName", "phone", "address", "totalAppointments", "completedAppointments", "totalCompletedSpending", "createdAt", "updatedAt"]
+    },
+    "ServiceCategory": {
+      "title": "ServiceCategory",
+      "description": "Service catalog category metadata managed by the owner.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "image": { "type": "string", "maxLength": 500 },
+        "displayOrder": { "type": "number" },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "label", "active", "updatedAt"]
+    },
+    "ServiceItem": {
+      "title": "ServiceItem",
+      "description": "Individual beauty service offering, pricing, duration, description, and spotlight flags.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "categoryLabel": { "type": "string", "maxLength": 100 },
+        "subcategory": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "price": { "type": "number" },
+        "durationMins": { "type": "number" },
+        "duration": { "type": "string", "maxLength": 40 },
+        "image": { "type": "string", "maxLength": 500000 },
+        "isFeatured": { "type": "boolean" },
+        "isPopular": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "category", "price", "durationMins", "active", "updatedAt"]
+    },
+    "BeautyPackage": {
+      "title": "BeautyPackage",
+      "description": "Curated multi-service beauty package managed by the owner.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "tagline": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "packagePrice": { "type": "number" },
+        "includedServiceIds": { "type": "array" },
+        "image": { "type": "string", "maxLength": 500000 },
+        "isOfficialOffer": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "includedServiceIds", "isOfficialOffer", "updatedAt"]
+    },
+    "BusinessOffer": {
+      "title": "BusinessOffer",
+      "description": "Promotional campaign offer banner configured by the owner.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "badge": { "type": "string", "maxLength": 80 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "subtitle": { "type": "string", "maxLength": 240 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "isActive": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "isActive", "updatedAt"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Core salon-at-home appointment request with separate preferred and assigned beautician fields.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookingReference": { "type": "string", "minLength": 4, "maxLength": 40 },
+        "customerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "customerUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "customerPhone": { "type": "string", "minLength": 8, "maxLength": 20 },
+        "customerWhatsapp": { "type": "string", "maxLength": 20 },
+        "customerEmail": { "type": "string", "maxLength": 160 },
+        "customerAddress": { "type": "string", "minLength": 2, "maxLength": 500 },
+        "customerArea": { "type": "string", "maxLength": 120 },
+        "landmark": { "type": "string", "maxLength": 200 },
+        "customerInstructions": { "type": "string", "maxLength": 600 },
+        "preferredBeauticianId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "preferredBeauticianName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "assignedBeauticianId": { "type": "string", "maxLength": 128 },
+        "assignedBeauticianName": { "type": "string", "maxLength": 120 },
+        "assignedBeauticianPhone": { "type": "string", "maxLength": 30 },
+        "assignedBeauticianUid": { "type": "string", "maxLength": 128 },
+        "assignedBeauticianEmail": { "type": "string", "maxLength": 160 },
+        "appointmentDate": { "type": "string", "minLength": 10, "maxLength": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "startTime": { "type": "string", "maxLength": 20 },
+        "endTime": { "type": "string", "maxLength": 20 },
+        "timeSlot": { "type": "string", "minLength": 3, "maxLength": 60 },
+        "items": { "type": "array" },
+        "estimatedTotal": { "type": "number" },
+        "totalDurationMins": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "assigned", "in_progress", "completed", "cancelled", "reschedule_requested", "customer_unavailable"],
+          "maxLength": 30
+        },
+        "assignmentStatus": { "type": "string", "enum": ["unassigned", "assigned", "reassigned"], "maxLength": 20 },
+        "beauticianNote": { "type": "string", "maxLength": 500 },
+        "adminNotes": { "type": "string", "maxLength": 500 },
+        "rejectionReason": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "bookingReference",
+        "customerId",
+        "customerUid",
+        "customerName",
+        "customerPhone",
+        "customerAddress",
+        "preferredBeauticianId",
+        "preferredBeauticianName",
+        "assignedBeauticianId",
+        "appointmentDate",
+        "timeSlot",
+        "items",
+        "estimatedTotal",
+        "totalDurationMins",
+        "status",
+        "assignmentStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AppointmentAssignment": {
+      "title": "AppointmentAssignment",
+      "description": "Audit trail of beautician assignments and reassignments on an appointment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "appointmentId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "bookingReference": { "type": "string", "minLength": 4, "maxLength": 40 },
+        "previousBeauticianId": { "type": "string", "maxLength": 128 },
+        "previousBeauticianName": { "type": "string", "maxLength": 120 },
+        "beauticianId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "beauticianName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "beauticianUid": { "type": "string", "maxLength": 128 },
+        "beauticianEmail": { "type": "string", "maxLength": 160 },
+        "assignedByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "action": { "type": "string", "enum": ["assigned", "reassigned", "unassigned"], "maxLength": 20 },
+        "note": { "type": "string", "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "appointmentId", "bookingReference", "beauticianId", "beauticianName", "assignedByUid", "action", "createdAt"]
+    },
+    "BookingStatusHistory": {
+      "title": "BookingStatusHistory",
+      "description": "Chronological state transition history for an appointment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "appointmentId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "bookingReference": { "type": "string", "minLength": 4, "maxLength": 40 },
+        "fromStatus": { "type": "string", "maxLength": 30 },
+        "toStatus": { "type": "string", "minLength": 1, "maxLength": 30 },
+        "changedByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "changedByRole": { "type": "string", "enum": ["owner", "beautician", "customer"], "maxLength": 20 },
+        "changedByName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "customerUid": { "type": "string", "maxLength": 128 },
+        "assignedBeauticianUid": { "type": "string", "maxLength": 128 },
+        "assignedBeauticianEmail": { "type": "string", "maxLength": 160 },
+        "note": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "appointmentId", "bookingReference", "toStatus", "changedByUid", "changedByRole", "changedByName", "createdAt"]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "Verified provider delivery log for WhatsApp Business Cloud API and Email notifications.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "appointmentId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "bookingReference": { "type": "string", "minLength": 4, "maxLength": 40 },
+        "eventType": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "recipientRole": { "type": "string", "enum": ["owner", "beautician", "customer"], "maxLength": 20 },
+        "recipientName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "recipientContact": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "channel": { "type": "string", "enum": ["whatsapp", "email"], "maxLength": 20 },
+        "status": { "type": "string", "enum": ["delivered", "failed", "not_configured"], "maxLength": 20 },
+        "providerMessageId": { "type": "string", "maxLength": 200 },
+        "errorMessage": { "type": "string", "maxLength": 500 },
+        "payloadSummary": { "type": "string", "maxLength": 600 },
+        "createdByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "appointmentId", "bookingReference", "eventType", "recipientRole", "recipientName", "recipientContact", "channel", "status", "createdByUid", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/profiles/{uid}": {
+      "schema": { "$ref": "#/entities/Profile" },
+      "description": "User authentication profiles and RBAC roles."
+    },
+    "/team_members/{memberId}": {
+      "schema": { "$ref": "#/entities/TeamMember" },
+      "description": "Confidential beautician HR profiles, login email bindings, and performance metrics."
+    },
+    "/public_beauticians/{memberId}": {
+      "schema": { "$ref": "#/entities/PublicBeautician" },
+      "description": "Publicly readable beautician showcase cards without unverified private contact exposure."
+    },
+    "/beautician_invites/{emailId}": {
+      "schema": { "$ref": "#/entities/BeauticianInvite" },
+      "description": "Owner-managed email-to-teamMember authorization bindings."
+    },
+    "/beautician_availability/{availId}": {
+      "schema": { "$ref": "#/entities/BeauticianAvailability" },
+      "description": "Beautician date-level blocked slots and day-off overrides."
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer directory and lifetime completed booking analytics."
+    },
+    "/service_categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/ServiceCategory" },
+      "description": "Service catalog categories."
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/ServiceItem" },
+      "description": "Master beauty services catalog and pricing."
+    },
+    "/packages/{packageId}": {
+      "schema": { "$ref": "#/entities/BeautyPackage" },
+      "description": "Curated beauty packages managed by owner."
+    },
+    "/offers/{offerId}": {
+      "schema": { "$ref": "#/entities/BusinessOffer" },
+      "description": "Promotional offers managed by owner."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Customer appointment requests, assignments, and lifecycle state."
+    },
+    "/appointment_assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/AppointmentAssignment" },
+      "description": "Audit log of beautician assignment and reassignment actions."
+    },
+    "/booking_status_history/{historyId}": {
+      "schema": { "$ref": "#/entities/BookingStatusHistory" },
+      "description": "Audit log of appointment status transitions."
+    },
+    "/notification_logs/{logId}": {
+      "schema": { "$ref": "#/entities/NotificationLog" },
+      "description": "Verified WhatsApp Business Cloud API and Email delivery logs."
+    }
+  }
+}

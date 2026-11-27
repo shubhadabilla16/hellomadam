@@ -14,6 +14,8 @@ export interface BeautyPackage {
   badge?: string;
   badgeHi?: string;
   image: string;
+  estimatedTime?: string;
+  highlights?: string[];
 }
 
 export const INITIAL_PACKAGES: BeautyPackage[] = [

@@ -1,7 +1,13 @@
 import React from 'react';
-import { ShieldCheck, Heart, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Sparkles, ArrowRight, BadgeCheck, Clock } from 'lucide-react';
+import { useAdmin } from '../context/AdminContext';
+import { PartnerAvatar } from './PartnerAvatar';
 
 export const MeetOurTeamSection: React.FC = () => {
+  const { publicBeauticians } = useAdmin();
+  const activePartners = publicBeauticians.filter((p) => p.active);
+
   return (
     <section className="py-20 sm:py-28 bg-[#faf7f2] border-t border-[#ebdccd] relative overflow-hidden">
       
@@ -19,107 +25,105 @@ export const MeetOurTeamSection: React.FC = () => {
         </svg>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-16">
         
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
+        <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-2 text-xs font-bold tracking-wider text-[#e03e1a] uppercase font-serif">
             <Sparkles className="w-3.5 h-3.5 text-[#e03e1a]" />
             <span>The Hello Madam Family</span>
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-stone-900 tracking-tight">
-            Meet the Team Behind Hello Madam.
+            Meet Our Beautician Partners
           </h2>
 
           <p className="text-base sm:text-lg text-stone-600 max-w-2xl mx-auto leading-relaxed">
-            A dedicated team bringing beauty, care and comfort to your doorstep.
+            Friendly, trained women beauticians delivering premium salon treatments to your doorstep in Solapur.
           </p>
         </div>
 
-        {/* Editorial Team Image & Story Split Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center max-w-6xl mx-auto">
-          
-          {/* Real Team Photograph */}
-          <div className="lg:col-span-7">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-[#ebdccd] bg-white p-2">
-              <div className="relative rounded-2xl overflow-hidden aspect-[4/3] sm:aspect-[16/11] bg-stone-100">
-                <img
-                  src="/assets/aistudio/hello_madam_team_group.jpg"
-                  alt="Hello Madam Professional Team in Solapur"
-                  className="w-full h-full object-cover object-center"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/60 via-transparent to-transparent" />
-                
-                {/* Real Team Tag on Image */}
-                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="/assets/aistudio/image_031d6967.png"
-                      alt="Logo"
-                      className="h-7 w-auto object-contain bg-white/95 px-2 py-0.5 rounded-lg"
-                    />
-                    <span className="text-xs font-bold text-white drop-shadow-sm">
-                      Official Hello Madam Solapur Team
-                    </span>
-                  </div>
-                  <span className="px-2.5 py-1 bg-[#e03e1a] text-white text-[10px] font-bold uppercase tracking-wider rounded-md">
-                    Verified Staff
+        {/* Partner Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
+          {activePartners.map((partner) => (
+            <div
+              key={partner.id}
+              className="bg-white rounded-3xl border border-[#ebdccd] p-5 shadow-xs hover:shadow-lg transition-all flex flex-col justify-between text-center group"
+            >
+              <div>
+                {/* Photo */}
+                <div className="flex justify-center mb-3.5">
+                  <PartnerAvatar
+                    photo={partner.photoUrl || `/assets/partners/${partner.id}.jpg`}
+                    name={partner.name}
+                    size="xl"
+                    className="w-24 h-24 sm:w-28 sm:h-28 group-hover:scale-105 transition-transform duration-300 ring-2 ring-[#ebdccd] group-hover:ring-[#e03e1a]"
+                  />
+                </div>
+
+                {/* Name + Verification */}
+                <div className="flex items-center justify-center gap-1">
+                  <h3 className="font-serif font-bold text-lg text-stone-900">
+                    {partner.name}
+                  </h3>
+                  {partner.isVerified && (
+                    <BadgeCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  )}
+                </div>
+
+                {/* Availability & Contact (Verified phone only when owner-verified) */}
+                <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-stone-500">
+                  <Clock className="w-3 h-3 text-[#e03e1a]" />
+                  <span>
+                    {partner.isVerified && partner.verifiedPhone
+                      ? partner.verifiedPhone
+                      : `${partner.workingHoursStart || '10:00 AM'} – ${partner.workingHoursEnd || '05:00 PM'}`}
                   </span>
                 </div>
+
+                <div className="mt-1.5">
+                  <span
+                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      partner.availabilityStatus === 'available'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : partner.availabilityStatus === 'busy'
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : 'bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    {partner.availabilityStatus === 'available'
+                      ? 'Available for Booking'
+                      : partner.availabilityStatus === 'busy'
+                      ? 'Limited Slots'
+                      : 'On Leave'}
+                  </span>
+                </div>
+
+                {/* Specialties */}
+                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                  {partner.specialties.map((spec) => (
+                    <span
+                      key={spec}
+                      className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#faf7f2] text-stone-700 border border-[#ebdccd]"
+                    >
+                      {spec}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Book with <Name> CTA */}
+              <div className="mt-5 pt-3 border-t border-[#ebdccd]/80">
+                <Link
+                  to={`/booking?partner=${partner.id}`}
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-[#e03e1a] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#c93514] active:scale-95 transition-all"
+                >
+                  <span>Book with {partner.name}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
             </div>
-
-            {/* Secondary arrival badge photo strip */}
-            <div className="mt-4 flex items-center gap-3 p-3 bg-white rounded-2xl border border-[#ebdccd] shadow-2xs">
-              <img
-                src="/assets/aistudio/hello_madam_team_arrival.jpg"
-                alt="Hello Madam Team arriving at client home"
-                className="w-16 h-12 rounded-xl object-cover shrink-0 border border-stone-200"
-              />
-              <div className="text-xs text-stone-600">
-                <strong className="text-stone-900 block">Punctual Doorstep Arrival:</strong>
-                Our beauticians arrive in uniform with sealed kits, ready to pamper you.
-              </div>
-            </div>
-          </div>
-
-          {/* Narrative & Commitment */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="text-xs font-bold uppercase tracking-wider text-[#e03e1a] font-serif">
-              Our Professional Care
-            </div>
-
-            <h3 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900 leading-snug">
-              Trained, Respectful & Exclusively for Ladies
-            </h3>
-
-            <p className="text-sm text-stone-600 leading-relaxed">
-              Every member of the Hello Madam team shares a common devotion to customer comfort, hospital-grade hygiene, and personalized aesthetic care.
-            </p>
-
-            <p className="text-sm text-stone-600 leading-relaxed">
-              Whether conducting an advanced Hydra Facial with LED therapy, a soothing floral pedicure, or precise threading, our beauticians treat your home with utmost respect and ensure complete privacy throughout your session.
-            </p>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center gap-3 text-xs text-stone-700 bg-white p-3.5 rounded-2xl border border-[#ebdccd]">
-                <ShieldCheck className="w-5 h-5 text-[#e03e1a] shrink-0" />
-                <span>100% women-only staff serving women in Solapur</span>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs text-stone-700 bg-white p-3.5 rounded-2xl border border-[#ebdccd]">
-                <Heart className="w-5 h-5 text-[#e03e1a] shrink-0" />
-                <span>Respectful, patient, and detail-oriented beauticians</span>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs text-stone-700 bg-white p-3.5 rounded-2xl border border-[#ebdccd]">
-                <CheckCircle2 className="w-5 h-5 text-[#e03e1a] shrink-0" />
-                <span>Zero mess policy—every disposable is packed & removed</span>
-              </div>
-            </div>
-          </div>
-
+          ))}
         </div>
 
       </div>

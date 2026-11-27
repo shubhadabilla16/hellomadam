@@ -27,6 +27,7 @@ export interface ServiceItem {
   benefits?: string[];
   isPopular?: boolean;
   featuredInVideo?: boolean;
+  active?: boolean;
 }
 
 export const CATEGORIES = [
